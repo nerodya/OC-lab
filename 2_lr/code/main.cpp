@@ -54,8 +54,7 @@ void killChild(int sig)
     kill(child_pid, SIGINT);
 }
 
-int main(int argc, char *argv[])
-{
+void runSecondTask() {
     pid_t pid = fork();
 
     if (pid == 0)
@@ -67,13 +66,19 @@ int main(int argc, char *argv[])
 
         pause();
 
-        cout << "Дочерний процесс убит\n";
+        cout << "\nРодительский процесс убит";
     }
     else
     {
         cout << "execlp из родительского процесса " << endl;
         execlp("telegram-desktop", "telegram-desktop", (char *)NULL);
     }
+}
+
+int main(int argc, char *argv[])
+{
+    
+    runSecondTask();
 
     return 0;
 }

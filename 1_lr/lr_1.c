@@ -7,13 +7,12 @@
 #include <stdlib.h>
 #include <fcntl.h>
 
-const char *file_arch = "/home/rodion/ocCode/1_lr/file"; 
-char dirArch[256];                                     
-char dirUnzip[256];                                     
+const char *file_arch = "/home/rodion/ocCode/1_lr/file";
+char dirArch[256];
+char dirUnzip[256];
 char *brackets = ">>>>\n";
 
 char fileDirectoryName[265];
-int countFiles = 0;
 
 void unzip(const char *fileArch, char *dirUnZip);
 void makeArch(char *dir);
@@ -74,13 +73,17 @@ void makeArch(char *dir)
         {
             FILE *file_in = fopen(entry->d_name, "r");
             if (file_in == NULL)
+            {
                 printf("%s", "the file did not open for reading");
+                exit(0);
+            }
 
             FILE *file_out = fopen(file_arch, "a");
             if (file_out == NULL)
+            {
                 printf("%s", "the file for recording did not open");
-
-            countFiles++;
+                exit(0);
+            }
 
             fprintf(file_out, "%s\n%s\n%s\n%d\n", "<<<<", fileDirectoryName, entry->d_name, getFileSize(entry->d_name));
 
@@ -94,8 +97,8 @@ void makeArch(char *dir)
             fclose(file_out);
         }
     }
-    int i = 0;
-    for (i = strlen(fileDirectoryName) - 2; i >= 0; i--)
+
+    for (int i = strlen(fileDirectoryName) - 2; i >= 0; i--)
     {
         if (fileDirectoryName[i] == '/')
             break;
@@ -109,6 +112,18 @@ void unzip(const char *fileArch, char *dirUnzip)
 {
     FILE *arch = fopen(fileArch, "r");
 
+    if (arch == NULL)
+    {
+        printf("%s", "the file did not open for reading");
+        exit(0);
+    }
+
+    if ((opendir(dirUnzip)) == NULL)
+    {
+        printf("cannot open directory: %s\n", dirUnzip);
+        exit(0);
+    }
+
     char str[1024];
     char path[256];
     char nextFile[256];
@@ -118,8 +133,7 @@ void unzip(const char *fileArch, char *dirUnzip)
 
     chdir(dirUnzip);
 
-    // while (countFiles-- != 0)
-    while (feof(arch) == 0) 
+    while (feof(arch) == 0)
     {
         fgets(str, 8, arch);
         fgets(path, 250, arch);
@@ -136,8 +150,9 @@ void unzip(const char *fileArch, char *dirUnzip)
 
         FILE *fileRead = fopen(tempStr, "w+");
         if (fileRead == NULL)
+        {
             printf("%s", "the file for recording did not open");
-
+        }
         fgets(str, 10, arch);
 
         while (1)
@@ -155,19 +170,19 @@ void unzip(const char *fileArch, char *dirUnzip)
 
 int getFileSize(const char *file)
 {
-    int _file_size = 0;
+    int fileSize = 0;
     FILE *fd = fopen(file, "rb");
     if (fd == NULL)
     {
-        _file_size = -1;
+        fileSize = -1;
     }
     else
     {
         while (getc(fd) != EOF)
-            _file_size++;
+            fileSize++;
         fclose(fd);
     }
-    return _file_size;
+    return fileSize;
 }
 
 void removeHyphen(char *str)
