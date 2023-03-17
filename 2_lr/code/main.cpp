@@ -8,40 +8,32 @@
 
 using namespace std;
 
-void runFerstTask(char *arg[])
+void runFerstTask(string comand, string options)
 {
-    try
+    pid_t pid = fork();
+
+    if (pid == 0)
     {
-        if (strcmp(arg[1], "ls") == 0 || strcmp(arg[1], "cat") == 0)
+        try
         {
-            if (fork() == 0)
             {
-                wait(0);
-            }
-            else
-            {
-                if (strcmp(arg[1], "ls") == 0)
+                string bin = "/bin/";
+                bin += comand;
+
+                if (execlp(bin.c_str(), comand.c_str(), options.c_str(), (char *)NULL) == -1)
                 {
-                    execlp("/bin/ls", arg[1], arg[2], (char *)NULL);
-                }
-                else
-                {
-                    execlp("/bin/cat", arg[1], arg[2], (char *)NULL);
+                    throw "Ошибка замещения текущего образа процесса новым образом процесса";
                 }
             }
         }
-        else
+        catch (const char *msg)
         {
-            throw "Такой команды не найдено";
+            cout << msg << endl;
+            exit(0);
         }
-    }
-    catch (const char *msg)
-    {
-        cout << msg << endl;
     }
 }
 
-pid_t child_pid;
 pid_t parent_pid;
 
 void killParent(int sig)
@@ -49,36 +41,62 @@ void killParent(int sig)
     kill(parent_pid, SIGINT);
 }
 
-void killChild(int sig)
+void runSecondTask(string options)
 {
-    kill(child_pid, SIGINT);
-}
-
-void runSecondTask() {
     pid_t pid = fork();
 
-    if (pid == 0)
+    if (pid != 0)
     {
-        cout << "Дочерний процесс\n";
+        cout << "Родительский процесс\n";
         parent_pid = getppid();
-
         signal(SIGINT, killParent);
-
         pause();
-
-        cout << "\nРодительский процесс убит";
+        cout << "\nДочерний процесс убит";
     }
     else
     {
-        cout << "execlp из родительского процесса " << endl;
-        execlp("telegram-desktop", "telegram-desktop", (char *)NULL);
+        cout << "execlp из дочернего процесса " << endl;
+        try
+        {
+            int e = execlp(options.c_str(), options.c_str(), (char *)NULL);
+            if (e == -1)
+            {
+                throw "Ошибка замещения текущего образа процесса новым образом процесса";
+            }
+        }
+        catch (const char *msg)
+        {
+            cout << msg;
+            exit(0);
+        }
     }
 }
 
 int main(int argc, char *argv[])
 {
-    
-    runSecondTask();
+    string command = "";
+    string options = "";
+
+    while (1)
+    {
+        cin >> command;
+
+        if (command == "run")
+        {
+            cin >> options;
+            runSecondTask(options);
+        }
+        else if (command == "ls" || command == "cat")
+        {
+            cin >> options;
+            runFerstTask(command, options);
+        }
+        else if (command == "exit")
+        {
+            cout << "Завершение программы\n";
+            return 1;
+        }
+    }
 
     return 0;
 }
