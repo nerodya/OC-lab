@@ -34,27 +34,25 @@ void runLsCatCommand(string comand, string options)
 void onC(int sig)
 {
     cout << "kill process with pid = " << pids.top() << endl;
-    kill(pids.top(), SIGKILL);
+    kill(pids.top(), SIGTERM);
     pids.pop();
 }
 
 void execChildProcess(string options)
 {
-    cout << "execlp из дочернего процесса " << endl;
+    signal(SIGINT, SIG_IGN);
+    cout << "execlp из дочернего процесса pid = " << getpid() << endl;
     try
     {
         int e = execlp(options.c_str(), options.c_str(), (char *)NULL);
         throw "Ошибка замещения текущего образа процесса новым образом процесса";
-        while (1)
-        {
-            sleep(1);
-        }
     }
     catch (const char *msg)
     {
         cout << msg;
         exit(0);
     }
+    exit(9);
 }
 
 void createAndRunChildProcess(string options)
@@ -67,7 +65,6 @@ void createAndRunChildProcess(string options)
     else
     {
         pids.push(pid);
-        cout << "created process with pid = " << pid;
     }
 }
 
@@ -75,10 +72,10 @@ int main(int argc, char *argv[])
 {
     string command = "";
     string options = "";
+    signal(SIGINT, onC);
 
     while (1)
     {
-        signal(SIGINT, onC);
         cin >> command;
         if (command == "run")
         {
