@@ -10,9 +10,8 @@
 using namespace std;
 
 stack<pid_t> pids;
-bool isComplete = false;
 
-void runFerstTask(string comand, string options)
+void runLsCatCommand(string comand, string options)
 {
     pid_t pid = fork();
     if (pid == 0)
@@ -21,10 +20,8 @@ void runFerstTask(string comand, string options)
         {
             string bin = "/bin/";
             bin += comand;
-            if (execlp(bin.c_str(), comand.c_str(), options.c_str(), (char *)NULL) == -1)
-            {
-                throw "Ошибка замещения текущего образа процесса новым образом процесса";
-            }
+            execlp(bin.c_str(), comand.c_str(), options.c_str(), (char *)NULL);
+            throw "Ошибка замещения текущего образа процесса новым образом процесса";
         }
         catch (const char *msg)
         {
@@ -39,41 +36,37 @@ void onC(int sig)
     cout << "kill process with pid = " << pids.top() << endl;
     kill(pids.top(), SIGKILL);
     pids.pop();
-    isComplete = false;
 }
 
-void runSecondTask(string options)
+void execChildProcess(string options)
 {
-    // pid_t pid = fork();
-
-    // if (pid != 0)
-    // {
-    //     cout << "Родительский процесс\n";
-    //     parent_pid = getppid();
-    //     signal(SIGINT, killParent);
-    //     pause();
-    //     cout << "\nДочерний процесс убит";
-    // }
-    // else
-
-    // if (pid == 0)
-    // {
     cout << "execlp из дочернего процесса " << endl;
     try
     {
-        int e = execlp(options.c_str(), options.c_str(), (char *)NULL);
-    
-            throw "Ошибка замещения текущего образа процесса новым образом процесса";
-       
+        // int e = execlp(options.c_str(), options.c_str(), (char *)NULL);
+        // throw "Ошибка замещения текущего образа процесса новым образом процесса";
         while (1)
         {
             sleep(1);
         }
-    }
+        }
     catch (const char *msg)
     {
         cout << msg;
         exit(0);
+    }
+}
+
+void createAndRunChildProcess(string options)
+{
+    pid_t pid = fork();
+    if (pid == 0)
+    {
+        execChildProcess(options);
+    }
+    else
+    {
+        pids.push(pid);
     }
 }
 
@@ -89,19 +82,12 @@ int main(int argc, char *argv[])
         if (command == "run")
         {
             cin >> options;
-            pid_t pid = fork();
-            if (pid == 0)
-            {
-                runSecondTask(options);
-            }
-            else
-            {
-                pids.push(pid);
-            }
+            createAndRunChildProcess(options);
         }
         else if (command == "ls" || command == "cat")
         {
             cin >> options;
+            runLsCatCommand(command, options);
         }
         else if (command == "exit")
         {
