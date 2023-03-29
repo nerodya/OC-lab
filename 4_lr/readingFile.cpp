@@ -1,5 +1,5 @@
 #include <iostream>
-#include <string>
+#include <cstring>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -7,20 +7,24 @@ using namespace std;
 
 void printFile(string nameFile)
 {
-    FILE *read_fp = popen(("cat " + nameFile + " -E -s").c_str(), "r");
-    char buffer[BUFSIZ + 1];
-    // memset(buffer, '\0' , sizeof(buffer));
+    int data_processed;
+    int file_pipes[2];
 
-    if (read_fp != NULL)
+    FILE *read_fp1 = popen(("cat " + nameFile + " -E -s").c_str(), "r");
+
+    char buffer_1[BUFSIZ + 1];
+    memset(buffer_1, '\0', sizeof(buffer_1));
+
+    if (read_fp1 != NULL)
     {
-        int chars_read = fread(buffer, sizeof(char), BUFSIZ, read_fp);
+        int chars_read = fread(buffer_1, sizeof(char), BUFSIZ, read_fp1);
         while (chars_read > 0)
         {
-            buffer[chars_read - 1] = '\0';
-            printf("%s\n",buffer);
-            chars_read = fread(buffer, sizeof(char), BUFSIZ, read_fp);
+            buffer_1[chars_read - 1] = '\0';
+            printf("%s\n", buffer_1);
+            chars_read = fread(buffer_1, sizeof(char), BUFSIZ, read_fp1);
         }
-        pclose(read_fp);
+        pclose(read_fp1);
         exit(EXIT_SUCCESS);
     }
     exit(EXIT_FAILURE);
@@ -28,7 +32,7 @@ void printFile(string nameFile)
 
 int main(int argc, char *argv[])
 {
-    printFile("/home/rodion/ocCode/4_lr/file1");
+    printFile(argv[1]);
 
     return 0;
 }
