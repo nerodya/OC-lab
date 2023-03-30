@@ -1,5 +1,5 @@
 #include <iostream>
-#include <string>
+#include <cstring>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -7,21 +7,55 @@ using namespace std;
 
 void operationXor(string file1, string file2, string resFile)
 {
-    FILE *read_fp = popen(("./printFile.out " + file1).c_str(), "r");
+    int count_file = 2;
+
+    string file[count_file];
+    file[0] = file1;
+    file[1] = file2;
+
     char buffer[BUFSIZ + 1];
-    if (read_fp != NULL)
+
+    string out_prog[count_file];
+
+    for (int i = 0; i < count_file; i++)
     {
-        int chars_read = fread(buffer, sizeof(char), BUFSIZ, read_fp);
-        while (chars_read > 0)
+        memset(buffer, '\0', sizeof(buffer));
+        FILE *prog = popen(("./readingFile.out " + file[i]).c_str(), "r");
+        if (prog != NULL)
         {
-            buffer[chars_read - 1] = '\0';
-            printf("%s\n", buffer);
-            chars_read = fread(buffer, sizeof(char), BUFSIZ, read_fp);
+            int chars_read = fread(buffer, sizeof(char), BUFSIZ, prog);
+            while (chars_read > 0)
+            {
+                buffer[chars_read - 1] = '\0';
+                // printf("%s\n", buffer);
+                out_prog[i].append(buffer);
+                chars_read = fread(buffer, sizeof(char), BUFSIZ, prog);
+            }
+            fclose(prog);
+            // exit(EXIT_SUCCESS);
         }
-        pclose(read_fp);
-        exit(EXIT_SUCCESS);
+        // exit(EXIT_FAILURE);
+        cout << out_prog[i];
     }
-    exit(EXIT_FAILURE);
+
+    FILE *out_file = fopen(resFile.c_str(), "w");
+    string string_out;
+
+    if (out_file != NULL)
+    {
+        // const char *char_file1 = out_prog[0].c_str();
+        // const char *code = out_prog[1].c_str();
+        string file = out_prog[0];
+        string code = out_prog[1];
+        int size_code = code.size();
+
+        for (int i = 0; i < file.size(); i++)
+        {
+            string_out.push_back(file[i] ^ code[i % size_code]);
+        }
+        
+        fputs(string_out.c_str(), out_file);
+    }
 }
 
 int main(int argc, char *argv[])
