@@ -20,8 +20,8 @@ void printFile(string nameFile)
         int chars_read = fread(buffer_1, sizeof(char), BUFSIZ, read_fp1);
         while (chars_read > 0)
         {
-            buffer_1[chars_read - 1] = '\0';
-            // printf("%s\n", buffer_1);
+            // buffer_1[chars_read - 1] = '\0';
+            printf("%s\n", buffer_1);
             chars_read = fread(buffer_1, sizeof(char), BUFSIZ, read_fp1);
         }
         pclose(read_fp1);
@@ -36,3 +36,5 @@ int main(int argc, char *argv[])
 
     return 0;
 }
+
+//khoirhng[oidcd;ohthyscmlkgnbqoiehfiurgk]
