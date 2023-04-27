@@ -1,122 +1,104 @@
-#include <sys/types.h>
-#include <sys/socket.h>
-
 #include <iostream>
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <string.h>
 #include <string>
-#include <fcntl.h>
-#include <thread>
-#include <unistd.h>
-
+#include <vector>
+#include <future>
+#include <mutex>
 #include <netinet/in.h>
+#include <unistd.h>
+#include <cstring>
+#include <sys/socket.h>
 #include <arpa/inet.h>
 
-const int MSG_LEN = 1024;
+using namespace std;
+
+mutex mtx;
+
+const int PORT = 8785;
 const int BUFFER_SIZE = 1024;
-
 const char *IP = "127.0.0.1";
-const int PORT = 8789;
 
-void receiveMessage(int socket) {
+void get_messages(int sockfd)
+{
     char buffer[BUFFER_SIZE];
-    while (true) {
-        int bytesReceived = recv(socket, buffer, BUFFER_SIZE, 0);
-        if (bytesReceived == -1) {
-            std::cerr << "recv failed" << std::endl;
+    while (true)
+    {
+        memset(buffer, 0, BUFFER_SIZE);
+        int bytes_received = recv(sockfd, buffer, BUFFER_SIZE, 0);
+        if (bytes_received == -1)
+        {
+            cerr << "\nне удалось получить сообщение с сервера\n\n";
+        }
+        else if (bytes_received == 0)
+        {
+            cerr << "\nсервер отключен\n";
+            close(sockfd);
             break;
         }
-        if (bytesReceived == 0) {
-            std::cout << "Server disconnected" << std::endl;
-            break;
+        else
+        {
+            string message(buffer);
+            cout << message;
         }
-        buffer[bytesReceived] = '\0';
-        std::cout << buffer;
     }
 }
 
-
-int main(int argv, char **args)
+int main(int argc, char *argv[])
 {
-	// if (argv != 3 || (args[2][0] != 's' && args[2][0] != 'r'))
-	// {
-	// 	printf("Incorrect input.\n");
-	// 	return 1;
-	// }
+    if (argc != 2)
+    {
+        cerr << "\nнеправильнный формат ввода\n";
+        exit(EXIT_FAILURE);
+    }
 
-	int client;
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
 
-	char client_request[256];
-	char server_response[256];
+    sockaddr_in server_address;
+    server_address.sin_family = AF_INET;
+    server_address.sin_addr.s_addr = inet_addr(IP);
+    server_address.sin_port = htons(PORT);
 
-	struct sockaddr_in server_addr;
+    if (connect(sockfd, (struct sockaddr *)&server_address, sizeof(server_address)) == -1)
+    {
+        cerr << "\nошибка соединения с сервером\n";
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
 
-	client = socket(AF_INET, SOCK_STREAM, 0);
+    cout << "успешное подключение к серверу\n"; 
 
-	server_addr.sin_family = AF_INET;
-	server_addr.sin_addr.s_addr = inet_addr(IP);
-	server_addr.sin_port = htons(PORT);
+    future<void> receive_future = async(launch::async, get_messages, ref(sockfd));
 
-	if (connect(client, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1)
-	{
-		printf("Connection error\n");
-		return 2;
-	}
-	else
-	{
-		std::thread receiveThread(receiveMessage, client);
+    string message;
+    string part_message;
+    string nickname(argv[1]);
 
-		strcpy(client_request, args[1]);
-		strcat(client_request, " ");
-		strcat(client_request, args[2]);
+    int bytes_sent = send(sockfd, nickname.c_str(), nickname.length(), 0);
+    if (bytes_sent == -1)
+    {
+        cerr << "\nне удалось отправить привет серверу\n\n";
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
 
-		// if (args[2][0] == 's')
-		// {
-			send(client, client_request, sizeof(client_request), 0);
+    mtx.lock();
+    while (true)
+    {
+        cin.clear();
+        message.clear();
+        message += nickname + " : ";
+        getline(cin, part_message);
+        message += part_message + "\n";
 
-			while (1)
-			{
-				scanf("%s", client_request);
-				send(client, client_request, sizeof(client_request), 0);
+        int bytes_sent = send(sockfd, message.c_str(), message.length(), 0);
+        if (bytes_sent == -1)
+        {
+            cerr << "\nне удалось отправить сообщение серверу\n\n";
+            break;
+        }
+    }
+    mtx.unlock();
+    receive_future.wait();
+    close(sockfd);
 
-
-
-////////////////////////////////////////////////////////
-				// strcpy(client_request, "refresh");
-				// send(client, client_request, sizeof(client_request), 0);
-
-				// // system("clear");
-
-				// recv(client, server_response, sizeof(server_response), 0);
-				// printf("%s\n", server_response);
-
-				// sleep(1);
-
-				/////////////////////////////////////////////
-			}
-		// }
-		// else
-		// {
-		// 	if (args[2][0] == 'r')
-		// 	{
-		// 		send(client, client_request, sizeof(client_request), 0);
-		// 		while (1)
-		// 		{
-		// 			strcpy(client_request, "refresh");
-		// 			send(client, client_request, sizeof(client_request), 0);
-
-		// 			system("clear");
-
-		// 			recv(client, server_response, sizeof(server_response), 0);
-		// 			printf("%s\n", server_response);
-
-		// 			sleep(1);
-		// 		}
-		// 	}
-		// }
-		close(client);
-	}
-	return 0;
+    return 0;
 }

@@ -1,203 +1,133 @@
-#include <sys/types.h>
-#include <sys/socket.h>
-
 #include <iostream>
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <string.h>
-#include <fcntl.h>
+#include <string>
 #include <vector>
-
-#include <netinet/in.h>
+#include <future>
+#include <mutex>
 #include <arpa/inet.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <cstring>
+#include <sstream>
 
-const int MSG_LEN = 1024;
+using namespace std;
 
+mutex mtx;
+
+const int PORT = 8785;
 const char *IP = "127.0.0.1";
-const int PORT = 8879;
-////////////////
-std::vector<int> clients;
-int a[5];
-/////////////////////
-int main()
+constexpr int MAX_CLIENTS = 10;
+constexpr int BUFFER_SIZE = 1024;
+
+void send_messages(int client_socket, vector<int> &clients, int index, int &socket_count, string message)
 {
-	int server;
-	int client;
-	int opt = 1;
+    cout << message;
+    mtx.lock();
+    for (int i = 0; i < socket_count; i++)
+        if (clients[i] != client_socket && clients[i] != -1)
+            if (send(clients[i], message.c_str(), message.size(), 0) == -1)
+                cerr << "не удалось отправить сообщение клиенту " << i << endl;
 
-	char client_request[256];
-	char server_response[256];
+    mtx.unlock();
+}
 
-	struct sockaddr_in server_addr;
-	struct sockaddr_in client_addr;
+void handle(int client_socket, vector<int> &clients, int index, int &socket_count, string name)
+{
+    char buffer[BUFFER_SIZE];
+    string message;
+    while (true)
+    {
+        memset(buffer, 0, BUFFER_SIZE);
+        int bytes_received = recv(client_socket, buffer, BUFFER_SIZE, 0);
 
-	int client_len = sizeof(client_addr);
+        if (bytes_received <= 0)
+        {
+            cerr << "\nклиент " << name << " отключился" << endl;
+            close(client_socket);
+            clients[index] = -1;
+            socket_count--;
+            index = -1;
+            break;
+        }
 
-	server = socket(AF_INET, SOCK_STREAM, 0);
+        message.clear();
+        message = string(buffer, bytes_received);
+        send_messages(client_socket, clients, index, socket_count, message);
+    }
+    close(client_socket);
+}
 
-	// Присвоение сокету опции SO_REUSEADDR
-	if (setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)))
-	{
-		perror("setsockopt");
-		exit(EXIT_FAILURE);
-	}
+int main(int argc, char const *argv[])
+{
+    vector<future<void>> futures(MAX_CLIENTS);
+    vector<int> clients(MAX_CLIENTS, -1);
 
-	server_addr.sin_family = AF_INET;
-	server_addr.sin_addr.s_addr = inet_addr(IP);
-	server_addr.sin_port = htons(PORT);
+    int server_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_socket == -1)
+    {
+        perror("ошибка при создании сокета");
+        exit(1);
+    }
 
-	if (bind(server, (struct sockaddr *)&server_addr, sizeof(server_addr)) != 0)
-	{
-		printf("Mistake 1");
-	}
+    struct sockaddr_in server_address;
+    server_address.sin_family = AF_INET;
+    server_address.sin_addr.s_addr = inet_addr(IP);
+    server_address.sin_port = htons(PORT);
 
-	if (listen(server, 5) != 0)
-	{
-		printf("Mistake 2");
-	}
+    if (bind(server_socket, (struct sockaddr *)&server_address, sizeof(server_address)) == -1)
+    {
+        perror("ошибка при биндинге адреса");
+        exit(1);
+    }
 
-	unsigned char users[16];
-	int users_ct = 0;
+    if (listen(server_socket, MAX_CLIENTS) == -1)
+    {
+        perror("ошибка при установке слушателя");
+        exit(1);
+    }
 
-	while (1)
-	{
-		client = accept(server, (struct sockaddr *)&client_addr, (socklen_t *)&client_len);
-		/////////////
-		clients.push_back(client);
-		///////////
-		users[users_ct++] = (char)client;
-		if (fork() == 0)
-		{
-			char name[256];
-			char buf[256];
-			char mode;
-///////////////////////////////////////////////////
-			for (auto client_other : clients)
-			{
-				std::cout << client_other << " , ";
-			}
-///////////////////////////////////////////////////
-			recv(client, client_request, sizeof(client_request), 0);
+    int index = -1;
+    int socket_count = 0;
 
-			for (int i = 0; i < strlen(client_request) - 2; i++)
-				name[i] = client_request[i];
-			name[strlen(client_request) - 2] = '\0';
+    while (true)
+    {
+        int len_addr = sizeof(server_address);
+        int client_socket = accept(server_socket, (struct sockaddr *)&server_address, (socklen_t *)&len_addr);
 
-			mode = client_request[strlen(client_request) - 1];
+        if (client_socket == -1)
+        {
+            cerr << "клиент не подключен" << endl;
+            continue;
+        }
+        else
+        {
+            if (socket_count < MAX_CLIENTS)
+            {
+                socket_count++;
+                index++;
+            }
+            else
+            {
+                cerr << "достигнуто максимальное число клиентов" << endl;
+                close(client_socket);
+                continue;
+            }
+        }
 
-			int histor = open("/home/rodion/ocCode/6_lr/chat_list", O_WRONLY | O_APPEND, S_IRUSR | S_IWUSR);
-			printf("%s-%c : connected\n", name, mode);
+        char buffer[BUFFER_SIZE];
+        memset(buffer, 0, BUFFER_SIZE);
+        int bytes_received = recv(client_socket, buffer, BUFFER_SIZE, 0);
 
-			strcpy(buf, name);
-			strcat(buf, "-");
-			// strcat(buf, &mode);
-			buf[strlen(buf) - 1] = mode;
-			strcat(buf, " : connected\n");
+        cout << "подключен клиент " << string(buffer) << " с номером = " << index << endl;
 
-			write(histor, buf, strlen(buf));
+        clients[index] = client_socket;
+        for (int j = 0; j < MAX_CLIENTS; j++)
+        {
+            cout << "\nклиент " << j << " с сокетом = " << clients[j];
+        }
+        cout << "\n\n";
 
-			close(histor);
-
-			if (mode == 's')
-			{
-				while (1)
-				{
-					int histor = open("/home/rodion/ocCode/6_lr/chat_list", O_WRONLY | O_APPEND, S_IRUSR | S_IWUSR);
-
-					int a = recv(client, client_request, sizeof(client_request), 0);
-
-					if (a <= 0)
-					{
-						printf("%s-%c : disconnected\n", name, mode);
-
-						strcpy(buf, name);
-						strcat(buf, "- ");
-						buf[strlen(buf) - 1] = mode;
-						strcat(buf, " : disconnected\n");
-
-						write(histor, buf, strlen(buf));
-						close(histor);
-
-						break;
-					}
-
-					if (strcmp(client_request, "refresh") != 0)
-					{
-						printf("%s : %s\n", name, client_request);
-						strcpy(buf, name);
-						strcat(buf, " : ");
-						strcat(buf, client_request);
-						strcat(buf, "\n");
-
-						write(histor, buf, strlen(buf));
-					}
-					/////////////////////////////
-					// strcpy(server_response, "");
-					// if (strcmp(client_request, "refresh") == 0)
-					// {
-
-					for (auto client_other : clients)
-					{
-						// std::cout << "client other = " + client_other;
-						if (client_other != client)
-						{
-							send(client_other, buf, sizeof(buf), 0);
-						}
-					}
-
-
-
-					// read(histor, server_response, 256);
-					// send(client, server_response, sizeof(server_response), 0);
-					// }
-					////////////////////////////////
-					close(histor);
-				}
-			}
-			else if (mode == 'r')
-			{
-				while (1)
-				{
-
-					int histor = open("/home/rodion/ocCode/6_lr/chat_list", O_RDONLY, S_IRUSR | S_IWUSR);
-
-					int a = recv(client, client_request, sizeof(client_request), 0);
-
-					if (a <= 0)
-					{
-						printf("%s-%c : disconnected\n", name, mode);
-
-						strcpy(buf, name);
-						strcat(buf, "-");
-						strcat(buf, " ");
-						buf[strlen(buf) - 1] = mode;
-						strcat(buf, " : disconnected\n");
-
-						write(histor, buf, strlen(buf));
-						close(histor);
-
-						break;
-					}
-
-					strcpy(server_response, "");
-
-					if (strcmp(client_request, "refresh") == 0)
-					{
-						read(histor, server_response, 256);
-						send(client, server_response, sizeof(server_response), 0);
-					}
-					else
-					{
-						strcpy(server_response, "ERROR");
-						send(client, server_response, sizeof(server_response), 0);
-					}
-
-					close(histor);
-				}
-			}
-		}
-	}
-	close(server);
-	return 0;
+        futures[index] = async(launch::async, handle, client_socket, ref(clients), cref(index), ref(socket_count), string(buffer));
+    }
+    close(server_socket);
+    return 0;
 }
