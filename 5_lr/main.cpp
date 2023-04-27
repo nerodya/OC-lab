@@ -17,8 +17,10 @@ void* sobelFilter(void* arg) {
     int startRow = data->startRow;
     int endRow = data->endRow;
     
-    for (int i = startRow; i < endRow; i++) {
-        for (int j = 1; j < image.cols - 1; j++) {
+    // for (int i = startRow; i < endRow; i++) {
+        // for (int j = 1; j < image.cols - 1; j++) {
+            for(int i = 1; i < image.cols - 1; i++) {
+                for(int j = startRow; j < endRow; j ++) {
             int gx = (image.at<uchar>(i - 1, j - 1) + 2 * image.at<uchar>(i, j - 1) + image.at<uchar>(i + 1, j - 1)) -
                      (image.at<uchar>(i - 1, j + 1) + 2 * image.at<uchar>(i, j + 1) + image.at<uchar>(i + 1, j + 1));
             int gy = (image.at<uchar>(i - 1, j - 1) + 2 * image.at<uchar>(i - 1, j) + image.at<uchar>(i - 1, j + 1)) -
@@ -27,14 +29,16 @@ void* sobelFilter(void* arg) {
             result.at<uchar>(i, j) = sum > 255 ? 255 : sum;
         }
     }
+    
     pthread_exit(NULL);
 }
+
 
 int main() {
     Mat image = imread("kat.jpg", IMREAD_GRAYSCALE);
     Mat result = Mat::zeros(image.size(), CV_8UC1);
     
-    int numThreads = 2;
+    int numThreads = 8;
     int rowsPerThread = image.rows / numThreads;
     
     pthread_t threads[numThreads];
